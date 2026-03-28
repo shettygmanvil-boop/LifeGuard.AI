@@ -11,14 +11,32 @@ const HealthForm = () => {
   const [result, setResult] = useState(null);
 
   // 2. THE HANDLER: This runs when the user clicks the button
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     setIsCalculating(true);
-    
-    // Simulate the AI "thinking" for 2 seconds
-    setTimeout(() => {
+
+    try {
+      // 1. Calling your Python Backend!
+      const response = await fetch("http://localhost:8000/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          age: parseInt(formData.age) || 20,
+          blood_sugar: 90.0,                        // Must be > 0
+          weight_kg: parseFloat(formData.bmi),
+          height_m: 1.75, // For now, we are hardcoding height to test
+          is_diabetic: false,  
+        }),
+      });
+
+      const data = await response.json();
+      
+      // 2. Updating the UI with real data from Python
+      setResult(`Real BMI: ${data.bmi} (${data.risk})`);
+    } catch (error) {
+      setResult("Error: Backend is not responding!");
+    } finally {
       setIsCalculating(false);
-      setResult("Low Risk (Demo Mode)");
-    }, 2000);
+    }
   };
 
   return (

@@ -100,8 +100,12 @@ Missing Imports: Some required tools (like OAuth) were being used before their i
 
 
 import os
+
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Depends
+from fastapi.middleware.cors import CORSMiddleware
+
 from pydantic import BaseModel, Field
 from starlette.middleware.sessions import SessionMiddleware
 from authlib.integrations.starlette_client import OAuth
@@ -116,6 +120,14 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # This allows EVERYONE for now, to skip the gate check
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+
+)
 # 3. Import Logic & Database
 from backend.logic.calculator import calculate_risk, calculate_bmi, calculate_health_score
 from backend.database.db import save_health_result
@@ -180,31 +192,31 @@ async def get_my_profile(request: Request):
 @app.post("/predict")
 async def predict_health(data: HealthData, request: Request):
     user_email = request.session.get('user', 'Guest')
-    user_name = request.session.get('user_name', 'Visitor')
+    
+    # Use your REAL logic from calculator.py
+    bmi_value = calculate_bmi(data.weight_kg, data.height_m)
+    health_score, reasons = calculate_health_score(data.age, data.blood_sugar, bmi_value, data.is_diabetic)
+    risk_result = calculate_risk(health_score)
+    
+    # We use join to turn the list of reasons into one simple string
+    feedback = " | ".join(reasons) if reasons else "All clear!"
 
-    # ADD YOUR LOGIC HERE (This is the rough work):
-    health_score = 100 - (data.age * 0.2) # Example: Replace with your real math
-    risk_result = "Low Risk"             # Example: Replace with your real logic
-    feedback = "Keep exercising!"       # Example: Replace with your real logic
-
-    # NOW these variables exist and the yellow lines will disappear:
-    result_to_save = {
-        "user_email": user_email,
-        "user_name": user_name,
-        "user_age": data.age,
-        "score": health_score,
+    return {
+        "status": "Success",
         "risk": risk_result,
+        "bmi": bmi_value, # This now correctly uses the calculated BMI
+        "score": health_score,
         "remarks": feedback
     }
     # ...
     
     # 3. Save to MongoDB
-    await save_health_result(result_to_save)
+    #await save_health_result(result_to_save)
     
     return {
         "status": "Success",
-        "risk_level": risk_result,
-        "bmi": bmi_value,
-        "overall_health_score": health_score,
+        "risk": risk_result,        # Matches the 'risk' in result_to_save
+        "bmi": data.bmi,           # Uses the BMI the user typed in
+        "score": health_score,      # Matches the 'score' in result_to_save
         "remarks": feedback
     }
