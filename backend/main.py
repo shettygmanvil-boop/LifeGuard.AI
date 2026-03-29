@@ -1,3 +1,4 @@
+from services.ai_service import get_health_advice
 import sys
 import os
 import joblib
@@ -25,7 +26,7 @@ MODEL_PATH = os.path.join(BASE_DIR, "diabetes_model.pkl")
 model = joblib.load(MODEL_PATH)
 
 # 3. INITIALIZE APP
-app = FastAPI()
+app = FastAPI(title="LifeGuard.AI - Smart Health Assistant")
 
 # 4. MIDDLEWARE
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -171,6 +172,26 @@ async def update_profile_permanently(user_email: str, profile: UserProfile):
         save_user_profile(data_to_save)
         
         return {"status": "Success", "message": f"Profile for {user_email} updated in SQL!"}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+
+# 2. Add the AI Tip Route
+@app.get("/ai-tip/{google_id}")
+async def get_user_ai_tip(google_id: str):
+    try:
+        # First, find the user in our SQL locker
+        user_profile = get_user_profile_by_google_id(google_id)
+        
+        if not user_profile:
+            return {"status": "Error", "message": "User not found"}
+        
+        # Convert SQL row to dictionary and ask Gemini for advice
+        tip = await get_health_advice(dict(user_profile))
+        
+        return {
+            "status": "Success",
+            "ai_tip": tip
+        }
     except Exception as e:
         return {"status": "Error", "message": str(e)}
 
