@@ -51,6 +51,14 @@ class HealthData(BaseModel):
     height_m: float = 1.75
     blood_sugar: float = 90.0
     is_diabetic: bool = False
+class UserProfile(BaseModel):
+    full_name: str
+    age: int
+    gender: str
+    target_weight: float
+    daily_calorie_goal: int = 2000
+    notification_enabled: bool = True
+    profile_picture_url: str = "https://example.com/default-avatar.png"
 
 # 6. ROUTES
 @app.get("/")
@@ -104,6 +112,37 @@ async def get_simulation(data: HealthData):
             "original_risk": data.Glucose,
             "simulated_risk": f"{round(new_risk_percent, 2)}%",
             "message": "This is your potential risk with improved habits!"
+        }
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+@app.get("/profile/{user_email}")
+async def get_user_profile(user_email: str):
+    try:
+        # In Day 11, we will pull this from the real Database
+        # For Day 10, we are returning a "Mock" profile to test the UI
+        return {
+            "status": "Success",
+            "profile": {
+                "full_name": "Manvil",
+                "email": user_email,
+                "age": 20,
+                "gender": "Male",
+                "target_weight": 75.0,
+                "daily_calorie_goal": 2200,
+                "college": "BMSIT",
+                "joined_date": "March 2026"
+            }
+        }
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+@app.put("/profile/{user_email}")
+async def update_user_profile(user_email: str, updated_data: UserProfile):
+    try:
+        # This is where we 'Overwrite' the old data with the new 'updated_data'
+        return {
+            "status": "Success",
+            "message": f"Profile for {user_email} has been updated!",
+            "new_goals": updated_data
         }
     except Exception as e:
         return {"status": "Error", "message": str(e)}
