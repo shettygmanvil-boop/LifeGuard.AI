@@ -116,30 +116,45 @@ async def get_simulation(data: HealthData):
     except Exception as e:
         return {"status": "Error", "message": str(e)}
 # Import the new database function at the top of main.py
-from backend.database.db import get_user_profile
+from backend.database.db import get_user_profile_by_google_id
 
-@app.get("/profile/{user_email}")
-async def fetch_real_profile(user_email: str):
+@app.get("/profile/google/{google_id}")
+async def fetch_profile_by_id(google_id: str):
     try:
-        # 1. Ask the 'Messenger' to find the data in SQL
-        db_data = get_user_profile(user_email)
+        # Search the 'Locker' using the unique Fingerprint
+        db_data = get_user_profile_by_google_id(google_id)
         
-        # 2. Check if the user actually exists in the 'Cabinet'
         if db_data:
             return {
                 "status": "Success",
-                "profile": {
-                    "email": db_data[0],
-                    "full_name": db_data[1],
-                    "age": db_data[2],
-                    "gender": db_data[3],
-                    "target_weight": db_data[4],
-                    "daily_calorie_goal": db_data[5]
-                }
+                "profile": dict(db_data) # Converts the SQL row to a clean Dictionary
             }
         else:
-            return {"status": "Error", "message": "User not found in LifeGuard database."}
+            return {"status": "Error", "message": "User not registered in LifeGuard.AI"}
             
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+    # 1. Add 'sync_google_user' to your imports at the top
+from backend.database.db import sync_google_user
+
+# 2. Add the Login Route
+@app.post("/login/google")
+async def login_with_google(google_data: dict):
+    try:
+        # The 'google_data' comes from Nipun's frontend
+        # It contains 'sub', 'name', 'email', and 'picture'
+        
+        # Sync the user into our SQLite Locker
+        sync_google_user(google_data)
+        
+        # Fetch the updated profile to send back to the frontend
+        user_profile = get_user_profile_by_google_id(google_data['sub'])
+        
+        return {
+            "status": "Success",
+            "message": "User authenticated and synced.",
+            "user": dict(user_profile)
+        }
     except Exception as e:
         return {"status": "Error", "message": str(e)}
 # Import the save function at the top of main.py
