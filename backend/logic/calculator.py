@@ -31,3 +31,21 @@ def calculate_health_score(age: int, sugar: float, bmi: float, is_diabetic: bool
         
     # We return both the score and the list of reasons
     return max(0, score), reasons
+
+# ... your existing functions are up here ...
+
+def simulate_improvement(current_data):
+    # This creates a "Best-Case" version of the user's data
+    improved_data = current_data.copy()
+    
+    # Improved Diet: Reduce Glucose by 20%
+    improved_data["Glucose"] = current_data["Glucose"] * 0.8
+    
+    # Exercise: Reduce BMI by 5%
+    improved_data["BMI"] = current_data["BMI"] * 0.95
+    
+    # Healthier sleep/habits often stabilize insulin
+    if improved_data.get("Insulin") == 0:
+        improved_data["Insulin"] = 30 
+        
+    return improved_data

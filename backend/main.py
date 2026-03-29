@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 from authlib.integrations.starlette_client import OAuth
 # Use the full path from the project root
-from backend.logic.calculator import calculate_risk, calculate_bmi, calculate_health_score
+from backend.logic.calculator import calculate_risk, calculate_bmi, calculate_health_score, simulate_improvement
 from backend.database.db import save_health_result
 
 # 1. LOAD SECRETS FIRST (The Master Key)
@@ -118,6 +118,41 @@ async def predict_health(data: HealthData, request: Request):
 
     except Exception as e:
         # This will tell us EXACTLY what went wrong in the response!
+        return {"status": "Error", "message": str(e)}
+    
+
+
+
+@app.post("/simulate")
+async def get_simulation(data: HealthData):
+    try:
+        # 1. Convert Pydantic data to a Dictionary
+        current_data_dict = data.dict()
+        
+        # 2. Run the "Improved Habits" logic
+        improved_stats = simulate_improvement(current_data_dict)
+        
+        # 3. Predict the NEW risk using the AI Brain
+        input_vector = [
+            float(improved_stats["Pregnancies"]),
+            float(improved_stats["Glucose"]),
+            float(improved_stats["BloodPressure"]),
+            float(improved_stats["SkinThickness"]),
+            float(improved_stats["Insulin"]),
+            float(improved_stats["BMI"]),
+            float(improved_stats["DiabetesPedigreeFunction"]),
+            float(improved_stats["Age"])
+        ]
+        
+        new_risk_percent = model.predict_proba([input_vector])[0][1] * 100
+        
+        return {
+            "status": "Success",
+            "original_risk": data.Glucose, # Just for comparison
+            "simulated_risk": f"{round(new_risk_percent, 2)}%",
+            "message": "This is your risk if you improve your diet and activity!"
+        }
+    except Exception as e:
         return {"status": "Error", "message": str(e)}
     
 if __name__ == "__main__":
