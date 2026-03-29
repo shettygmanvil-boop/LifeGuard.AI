@@ -49,3 +49,21 @@ def simulate_improvement(current_data):
         improved_data["Insulin"] = 30 
         
     return improved_data
+def get_risk_explanations(data_dict):
+    # This identifies the "Why" behind the risk
+    reasons = []
+    
+    if float(data_dict.get("Glucose", 0)) > 140:
+        reasons.append("High Glucose level is the primary risk driver.")
+        
+    if float(data_dict.get("BMI", 0)) > 30:
+        reasons.append("BMI is in the obese range, significantly increasing risk.")
+        
+    if float(data_dict.get("Age", 0)) > 45:
+        reasons.append("Age-related factors contribute to higher vulnerability.")
+        
+    if float(data_dict.get("BloodPressure", 0)) > 90:
+        reasons.append("Elevated Blood Pressure adds strain to the system.")
+
+    # Return top 3 reasons or a 'Healthy' message
+    return reasons[:3] if reasons else ["Lifestyle factors are currently in a healthy range."]
