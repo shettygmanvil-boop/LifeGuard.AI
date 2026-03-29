@@ -1,138 +1,60 @@
-'''import os
-from dotenv import load_dotenv
+import sys
+from pathlib import Path
 
-# This line finds the .env file and loads the variables into your system
-load_dotenv()
-
-# Now we 'Fetch' the specific secrets we saved earlier
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-SECRET_KEY = os.getenv("SECRET_KEY")
-from fastapi import FastAPI
-from pydantic import BaseModel, Field
-from backend.logic.calculator import calculate_risk, calculate_bmi,calculate_health_score
-from backend.database.db import save_health_result
-from fastapi import Request
-app = FastAPI()
-
-@app.get("/login")
-async def login(request: Request):
-    # This creates the URL for your 'Callback' (where the user returns)
-    redirect_uri = request.url_for('auth_callback')
-    # This sends the user to Google's login page
-    return await oauth.google.authorize_redirect(request, redirect_uri)
-@app.get("/auth/callback")
-async def auth_callback(request: Request):
-    # 1. The 'Handshake': Trade the code for the user's Google Info
-    token = await oauth.google.authorize_access_token(request)
-    user_info = token.get('userinfo')
-    
-    # 2. The 'Memory': Save the user's email in the Session
-    if user_info:
-        request.session['user'] = user_info['email']
-        request.session['user_name'] = user_info['name']
-        
-    # 3. The 'Welcome': Send them back to the main page
-    return {"message": f"Welcome {user_info['name']}! You are now logged in."}
-@app.get("/logout")
-async def logout(request: Request):
-    # This clears the 'Memory' (the sticky note)
-    request.session.pop('user', None)
-    return {"message": "You have been logged out safely."}
-class HealthData(BaseModel):
-    age: int = Field(gt=0, lt=120)
-    blood_sugar: float = Field(gt=0)
-    is_diabetic: bool
-    weight_kg: float = Field(gt=10, lt=300) # Added Weight
-    height_m: float = Field(gt=0.5, lt=2.5) # Added Height (in meters)
-
-app = FastAPI()
-from starlette.middleware.sessions import SessionMiddleware
-
-# This tells the 'Guard' to remember users using your Secret Key
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)    
-from authlib.integrations.starlette_client import OAuth
-
-# This creates the 'Manager' for all our login types
-oauth = OAuth()
-
-# This tells the manager specifically how to talk to Google
-oauth.register(
-    name='google',
-    client_id=GOOGLE_CLIENT_ID,
-    client_secret=GOOGLE_CLIENT_SECRET,
-    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    client_kwargs={'scope': 'openid email profile'}
-)
-@app.get("/")
-def home():
-    return {"message": "LifeGuard AI is running!"}
-@app.post("/predict")
-async def predict_health(data: HealthData): # Added 'async' here!
-    # 1. Logic Calculations
-    bmi_value = calculate_bmi(data.weight_kg, data.height_m)
-    health_score, feedback = calculate_health_score(data.age, data.blood_sugar, bmi_value, data.is_diabetic)
-    risk_result = calculate_risk(health_score)
-    
-    # 2. Prepare the "Folder" to be saved
-    result_to_save = {
-        "user_age": data.age,
-        "score": health_score,
-        "risk": risk_result,
-        "remarks": feedback
-    }
-    
-    # 3. Save to Cloud (The new line!)
-    await save_health_result(result_to_save)
-    
-    return {
-        "status": "Success",
-        "risk_level": risk_result,
-        "bmi": bmi_value,
-        "overall_health_score": health_score,
-        "remarks": feedback
-    }
-    The Overwrite: You defined app = FastAPI() once at the top and again in the middle. The second one wiped out the /login and /callback routes you had already defined.
-
-The Ghost 'oauth': You were using the oauth variable in your login function before you actually created it (defined it) later in the file.
-
-Missing Imports: Some required tools (like OAuth) were being used before their import lines.'''
-
-
+# Add the current folder to the Python path
+sys.path.append(str(Path(__file__).parent.parent))
 import os
-
-
+import joblib
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 from authlib.integrations.starlette_client import OAuth
-
-# 1. Load Secrets
-load_dotenv()
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-SECRET_KEY = os.getenv("SECRET_KEY")
-
-# 2. Initialize App (ONLY ONCE)
-app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # This allows EVERYONE for now, to skip the gate check
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-
-)
-# 3. Import Logic & Database
+# Use the full path from the project root
 from backend.logic.calculator import calculate_risk, calculate_bmi, calculate_health_score
 from backend.database.db import save_health_result
 
-# 4. Setup Google OAuth
+# 1. LOAD SECRETS FIRST (The Master Key)
+load_dotenv()
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+# 2. LOAD THE AI BRAIN (The Knowledge)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "diabetes_model.pkl")
+model = joblib.load(MODEL_PATH)
+
+# 3. INITIALIZE THE APP (The Building)
+app = FastAPI()
+
+# 4. ATTACH SECURITY (The Guards)
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 5. DATA BLUEPRINT
+class HealthData(BaseModel):
+    Pregnancies: int
+    Glucose: float
+    BloodPressure: float
+    SkinThickness: float
+    Insulin: float
+    BMI: float
+    DiabetesPedigreeFunction: float
+    Age: int
+    weight_kg: float = 70.0 
+    height_m: float = 1.75
+    blood_sugar: float = 90.0
+    is_diabetic: bool = False
+
+# 6. AUTH SETUP
 oauth = OAuth()
 oauth.register(
     name='google',
@@ -142,15 +64,7 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
-# 5. Data Models
-class HealthData(BaseModel):
-    age: int = Field(gt=0, lt=120)
-    blood_sugar: float = Field(gt=0)
-    is_diabetic: bool
-    weight_kg: float = Field(gt=10, lt=300)
-    height_m: float = Field(gt=0.5, lt=2.5)
-
-# 6. Routes (The 'Doors')
+# 7. ROUTES
 @app.get("/")
 def home():
     return {"message": "LifeGuard AI is running!"}
@@ -167,56 +81,45 @@ async def auth_callback(request: Request):
     if user_info:
         request.session['user'] = user_info['email']
         request.session['user_name'] = user_info['name']
-    return {"message": f"Welcome {user_info['name']}! You are now logged in."}
+    return {"message": f"Welcome {user_info['name']}! Logged in."}
 
-@app.get("/logout")
-async def logout(request: Request):
-    request.session.pop('user', None)
-    return {"message": "You have been logged out safely."}
-@app.get("/me")
-async def get_my_profile(request: Request):
-    # This pulls the 'sticky note' out of your session pocket
-    user = request.session.get('user')
-    user_name = request.session.get('user_name')
-    
-    if not user:
-        return {"error": "You are not logged in!"}
-        
-    return {
-        "email": user,
-        "name": user_name,
-        "message": "This data is coming straight from your Google Profile!"
-    }
-
-    
 @app.post("/predict")
 async def predict_health(data: HealthData, request: Request):
     user_email = request.session.get('user', 'Guest')
     
-    # Use your REAL logic from calculator.py
-    bmi_value = calculate_bmi(data.weight_kg, data.height_m)
-    health_score, reasons = calculate_health_score(data.age, data.blood_sugar, bmi_value, data.is_diabetic)
-    risk_result = calculate_risk(health_score)
-    
-    # We use join to turn the list of reasons into one simple string
-    feedback = " | ".join(reasons) if reasons else "All clear!"
+    try:
+        # 1. AI Calculation - Force the data into a "Numpy-like" list
+        input_data = [
+            float(data.Pregnancies), 
+            float(data.Glucose), 
+            float(data.BloodPressure), 
+            float(data.SkinThickness), 
+            float(data.Insulin), 
+            float(data.BMI), 
+            float(data.DiabetesPedigreeFunction), 
+            float(data.Age)
+        ]
+        
+        # The AI expects a "List of Lists" -> [[...]]
+        ai_risk_percent = model.predict_proba([input_data])[0][1] * 100
+        
+        # 2. Manual Logic
+        from logic.calculator import calculate_risk, calculate_bmi, calculate_health_score
+        from database.db import save_health_result
+        bmi_val = calculate_bmi(data.weight_kg, data.height_m)
+        h_score, reasons = calculate_health_score(data.Age, data.blood_sugar, bmi_val, data.is_diabetic)
+        
+        return {
+            "status": "Success",
+            "ai_risk": f"{round(ai_risk_percent, 2)}%",
+            "manual_score": h_score,
+            "remarks": " | ".join(reasons) if reasons else "Healthy"
+        }
 
-    return {
-        "status": "Success",
-        "risk": risk_result,
-        "bmi": bmi_value, # This now correctly uses the calculated BMI
-        "score": health_score,
-        "remarks": feedback
-    }
-    # ...
+    except Exception as e:
+        # This will tell us EXACTLY what went wrong in the response!
+        return {"status": "Error", "message": str(e)}
     
-    # 3. Save to MongoDB
-    #await save_health_result(result_to_save)
-    
-    return {
-        "status": "Success",
-        "risk": risk_result,        # Matches the 'risk' in result_to_save
-        "bmi": data.bmi,           # Uses the BMI the user typed in
-        "score": health_score,      # Matches the 'score' in result_to_save
-        "remarks": feedback
-    }
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)   
