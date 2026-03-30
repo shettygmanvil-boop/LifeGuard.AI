@@ -1,4 +1,5 @@
 from services.ai_service import get_health_advice
+from services.voice_service import process_voice_command
 import sys
 import os
 import joblib
@@ -179,18 +180,40 @@ async def update_profile_permanently(user_email: str, profile: UserProfile):
 @app.get("/ai-tip/{google_id}")
 async def get_user_ai_tip(google_id: str):
     try:
-        # First, find the user in our SQL locker
-        user_profile = get_user_profile_by_google_id(google_id)
+        # 1. Look up the specific record linked to the Google Fingerprint
+        db_data = get_user_profile_by_google_id(google_id)
         
-        if not user_profile:
-            return {"status": "Error", "message": "User not found"}
+        if not db_data:
+            return {"status": "Error", "message": "Google ID not registered."}
         
-        # Convert SQL row to dictionary and ask Gemini for advice
-        tip = await get_health_advice(dict(user_profile))
+        # 2. Convert the SQL row to a dict and pass to the AI
+        user_dict = dict(db_data)
+        tip = await get_health_advice(user_dict)
         
         return {
             "status": "Success",
+            "user": user_dict['full_name'],
             "ai_tip": tip
+        }
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+@app.post("/voice-command")
+async def handle_voice(data: dict):
+    """
+    Receives text from the Web Speech API and returns the intended action.
+    """
+    try:
+        user_text = data.get("text", "")
+        if not user_text:
+            return {"status": "Error", "message": "No text received"}
+            
+        # Use our voice logic to find the intent
+        intent = process_voice_command(user_text)
+        
+        return {
+            "status": "Success",
+            "intent": intent,
+            "message": f"Intent identified: {intent}"
         }
     except Exception as e:
         return {"status": "Error", "message": str(e)}
