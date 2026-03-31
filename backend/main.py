@@ -1,4 +1,5 @@
 from services.ai_service import get_health_advice
+from services.map_service import get_nearby_hospitals
 from services.voice_service import process_voice_command
 import sys
 import os
@@ -214,6 +215,20 @@ async def handle_voice(data: dict):
             "status": "Success",
             "intent": intent,
             "message": f"Intent identified: {intent}"
+        }
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+@app.get("/nearby-hospitals")
+async def find_hospitals(lat: float, lng: float):
+    """
+    Endpoint to fetch 5 nearby hospitals based on coordinates.
+    """
+    try:
+        hospitals = get_nearby_hospitals(lat, lng)
+        return {
+            "status": "Success",
+            "count": len(hospitals),
+            "data": hospitals
         }
     except Exception as e:
         return {"status": "Error", "message": str(e)}
