@@ -1,16 +1,24 @@
-from services.ai_service import get_health_advice
-from services.map_service import get_nearby_hospitals
-from services.voice_service import process_voice_command
 import sys
 import os
+
+# This tells Python to look inside the current folder for any 'services'
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from fastapi import FastAPI
+# ... your other imports like 'from services.dashboard_service' stay below this
+from services.ai_services import get_health_advice
+from services.map_services import get_nearby_hospitals
+from services.voice_services import process_voice_command
+
 import joblib
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 from authlib.integrations.starlette_client import OAuth
+from services.dashboard_service import get_user_health_history
 
 # Add current folder to path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -232,6 +240,23 @@ async def find_hospitals(lat: float, lng: float):
         }
     except Exception as e:
         return {"status": "Error", "message": str(e)}
+@app.get("/dashboard/{google_id}")
+async def fetch_dashboard(google_id: str):
+    """
+    Fetches real-time health logs from MongoDB Cloud.
+    """
+    try:
+        # We MUST use 'await' because get_user_health_history is now an 'async' function
+        history = await get_user_health_history(google_id) 
+        
+        return {
+            "status": "Success",
+            "google_id": google_id,
+            "count": len(history),
+            "history": history
+        }
+    except Exception as e:
+        return {"status": "Error", "message": f"Cloud Connection Issue: {str(e)}"}
 
 if __name__ == "__main__":
     import uvicorn
