@@ -48,28 +48,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 5. DATA BLUEPRINT (LifeGuard.AI Specification)
 class HealthData(BaseModel):
+    # --- Blueprint Fields (For Dashboard/UI) ---
+    age: int
+    Gender: str
+    Height: float
+    Weight: float
+    sleep_duration: float
+    physical_activity: str
+    stress_level: int
+    Diet_quality: str
+    sugar_intake: str
+    salt_intake: str
+    Smoking_habit: str
+    Alcohol_consumption: str
     Pregnancies: int
-    Glucose: float
-    BloodPressure: float
-    SkinThickness: float
-    Insulin: float
-    BMI: float
-    DiabetesPedigreeFunction: float
-    Age: int
-    weight_kg: float = 70.0 
-    height_m: float = 1.75
-    blood_sugar: float = 90.0
+    
+    # --- Medical Fields (Required by your AI Model) ---
+    Glucose: float = 100.0
+    BloodPressure: float = 80.0
+    SkinThickness: float = 20.0
+    Insulin: float = 79.0
+    BMI: float = 25.0
+    DiabetesPedigreeFunction: float = 0.5
     is_diabetic: bool = False
 class UserProfile(BaseModel):
     full_name: str
-    age: int
-    gender: str
-    target_weight: float
-    daily_calorie_goal: int = 2000
-    notification_enabled: bool = True
-    profile_picture_url: str = "https://example.com/default-avatar.png"
+    email: str
+    phone_number: str
 
 # 6. ROUTES
 @app.get("/")
@@ -78,19 +84,21 @@ def home():
 
 @app.post("/predict")
 async def predict_health(data: HealthData):
+    risk_percent = 0.0  # <--- Safety Net: Always start with a default
     try:
-        # Prepare inputs for AI
+        # Prepare inputs for AI (Fixed to lowercase 'age')
         input_vector = [
             float(data.Pregnancies), float(data.Glucose), float(data.BloodPressure),
             float(data.SkinThickness), float(data.Insulin), float(data.BMI),
-            float(data.DiabetesPedigreeFunction), float(data.Age)
+            float(data.DiabetesPedigreeFunction), float(data.age)
         ]
         
         # AI Prediction
-        risk_percent = model.predict_proba([input_vector])[0][1] * 100
+        prediction_probs = model.predict_proba([input_vector])
+        risk_percent = prediction_probs[0][1] * 100
         
-        # Manual Score & Explanations (Day 9 Target)
-        health_score, manual_reasons = calculate_health_score(data.Age, data.Glucose, data.BMI, data.is_diabetic)
+        # Manual Score & Explanations (Fixed to lowercase 'age')
+        health_score, manual_reasons = calculate_health_score(data.age, data.Glucose, data.BMI, data.is_diabetic)
         explanations = get_risk_explanations(data.dict())
         
         return {
@@ -101,7 +109,8 @@ async def predict_health(data: HealthData):
             "explanations": explanations 
         }
     except Exception as e:
-        return {"status": "Error", "message": f"Calculation Error: {str(e)}"}
+        # If AI fails, still return a status but show the specific error
+        return {"status": "Error", "message": f"AI Engine Error: {str(e)}"}
 
 @app.post("/simulate")
 async def get_simulation(data: HealthData):
