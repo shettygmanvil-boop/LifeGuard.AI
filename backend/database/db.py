@@ -49,15 +49,25 @@ def create_profile_table():
 def save_user_profile(profile_data):
     conn = get_db_connection()
     cursor = conn.cursor()
-    # We use UPDATE for existing users to ensure we don't create duplicates
+    # Use INSERT OR IGNORE to create the row if it doesn't exist,
+    # then UPDATE only the editable fields — preserves google_id & profile_picture
+    cursor.execute(
+        'INSERT OR IGNORE INTO user_profiles (email) VALUES (?)',
+        (profile_data['email'],)
+    )
     cursor.execute('''
-        INSERT OR REPLACE INTO user_profiles (email, full_name, age, gender, target_weight, daily_calorie_goal)
-        VALUES (?, ?, ?, ?, ?, ?)
+        UPDATE user_profiles
+        SET full_name = ?, age = ?, gender = ?, target_weight = ?, daily_calorie_goal = ?
+        WHERE email = ?
     ''', (
-        profile_data['email'], profile_data['full_name'], profile_data['age'],
-        profile_data['gender'], profile_data['target_weight'], profile_data['daily_calorie_goal']
+        profile_data.get('full_name'),
+        profile_data.get('age'),
+        profile_data.get('gender'),
+        profile_data.get('target_weight'),
+        profile_data.get('daily_calorie_goal'),
+        profile_data['email'],
     ))
-    conn.commit() # This is the "Save Button"
+    conn.commit()
     conn.close()
 
 def get_user_profile_by_google_id(google_id):

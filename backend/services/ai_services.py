@@ -3,34 +3,76 @@ import httpx
 from dotenv import load_dotenv
 from pathlib import Path
 
-# Load secrets
 env_path = Path(__file__).resolve().parent.parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
 API_KEY = os.getenv("GEMINI_API_KEY")
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
 
-async def get_health_advice(db_row: dict):
-    """Uses the data fetched from SQL (google_id) to give advice."""
-    
-    # We pull directly from the dictionary keys that match your SQL columns
-    payload = {
-        "contents": [{
-            "parts": [{
-                "text": (
-                    f"You are the LifeGuard.AI coach for {db_row.get('full_name')}. "
-                    f"His strict target is to reach {db_row.get('target_weight')}kg. "
-                    "Provide a 2-line health tip. Address him by name."
-                )
-            }]
-        }]
-    }
 
+async def _call_gemini(prompt: str) -> str:
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.post(URL, json=payload, timeout=10.0)
-            if response.status_code == 200:
-                return response.json()['candidates'][0]['content']['parts'][0]['text']
-            return f"Keep going, {db_row.get('full_name')}! You're close to {db_row.get('target_weight')}kg!"
+            r = await client.post(URL, json=payload, timeout=15.0)
+            if r.status_code == 200:
+                return r.json()["candidates"][0]["content"]["parts"][0]["text"]
         except Exception:
-            return f"Stay active today, {db_row.get('full_name')}!"
+            pass
+    return None
+
+
+async def get_health_advice(user: dict) -> str:
+    """Short 2-line tip for the dashboard."""
+    prompt = (
+        f"You are LifeGuard.AI coach. The user is {user.get('full_name', 'the user')}, "
+        f"age {user.get('age', '?')}, gender {user.get('gender', '?')}, "
+        f"target weight {user.get('target_weight', '?')} kg. "
+        "Give exactly 2 motivating, actionable health tips. Be concise and personal."
+    )
+    result = await _call_gemini(prompt)
+    return result or f"Stay consistent, {user.get('full_name', 'friend')}! Small daily habits lead to big results."
+
+
+async def get_health_roadmap(health_data: dict, health_score: int, disease_risks: dict) -> str:
+    """
+    Generates a personalised AI roadmap with specific tips to improve health score
+    and reduce disease risks.
+    """
+    risks_text = (
+        f"Type-2 Diabetes: {disease_risks.get('type2_diabetes')}%, "
+        f"Hypertension: {disease_risks.get('hypertension')}%, "
+        f"Cardiovascular: {disease_risks.get('cardiovascular')}%, "
+        f"Obesity: {disease_risks.get('obesity')}%"
+    )
+
+    prompt = (
+        f"You are LifeGuard.AI, a professional health coach AI. "
+        f"A user has the following health profile:\n"
+        f"- Age: {health_data.get('age')}, Gender: {health_data.get('Gender')}\n"
+        f"- BMI: {health_data.get('BMI')}, Glucose: {health_data.get('Glucose')}, "
+        f"Blood Pressure: {health_data.get('BloodPressure')}\n"
+        f"- Physical Activity: {health_data.get('physical_activity')}, "
+        f"Sleep: {health_data.get('sleep_duration')} hrs, Stress: {health_data.get('stress_level')}/10\n"
+        f"- Smoking: {health_data.get('Smoking_habit')}, Alcohol: {health_data.get('Alcohol_consumption')}, "
+        f"Sugar Intake: {health_data.get('sugar_intake')}\n"
+        f"- Current Health Score: {health_score}/100\n"
+        f"- Disease Risk Estimates: {risks_text}\n\n"
+        f"Generate a personalised 4-week health improvement roadmap. "
+        f"Structure it as:\n"
+        f"**Week 1 – Foundation:** (2-3 specific actions)\n"
+        f"**Week 2 – Build Momentum:** (2-3 specific actions)\n"
+        f"**Week 3 – Intensify:** (2-3 specific actions)\n"
+        f"**Week 4 – Sustain:** (2-3 specific actions)\n"
+        f"**Key Focus Areas:** List the top 3 things this person must prioritise.\n"
+        f"Be specific, actionable, and address their actual risk factors. Keep it under 300 words."
+    )
+
+    result = await _call_gemini(prompt)
+    return result or (
+        "**Week 1:** Start with 20-min daily walks and reduce sugar intake.\n"
+        "**Week 2:** Add strength training twice a week. Track your meals.\n"
+        "**Week 3:** Aim for 7-8 hrs sleep. Practice stress-reduction techniques.\n"
+        "**Week 4:** Maintain all habits. Schedule a health check-up.\n"
+        "**Key Focus:** Diet, Exercise, Sleep."
+    )

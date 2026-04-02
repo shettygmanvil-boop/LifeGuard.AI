@@ -1,1 +1,24 @@
+# Environment
 .env
+*.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# DB (SQLite is local only — MongoDB handles cloud persistence)
+backend/database/lifeguard.db
+
+# OS
+.DS_Store
+Thumbs.db
