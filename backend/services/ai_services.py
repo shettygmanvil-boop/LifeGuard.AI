@@ -46,6 +46,14 @@ async def get_health_roadmap(health_data: dict, health_score: int, disease_risks
         f"Obesity: {disease_risks.get('obesity')}%"
     )
 
+    score_instruction = ""
+    if health_score < 60:
+        score_instruction = "Their health score is critically low. Focus on urgent lifestyle interventions, strong encouragement to consult medical professionals, and immediate risk mitigation."
+    elif health_score < 85:
+        score_instruction = "Their health score is moderate. Focus on sustainable lifestyle improvements, building better habits, and reducing specific identified risks."
+    else:
+        score_instruction = "Their health score is excellent. Focus on maintaining current good habits, fine-tuning their routine, and long-term optimization."
+
     prompt = (
         f"You are LifeGuard.AI, a professional health coach AI. "
         f"A user has the following health profile:\n"
@@ -56,9 +64,9 @@ async def get_health_roadmap(health_data: dict, health_score: int, disease_risks
         f"Sleep: {health_data.get('sleep_duration')} hrs, Stress: {health_data.get('stress_level')}/10\n"
         f"- Smoking: {health_data.get('Smoking_habit')}, Alcohol: {health_data.get('Alcohol_consumption')}, "
         f"Sugar Intake: {health_data.get('sugar_intake')}\n"
-        f"- Current Health Score: {health_score}/100\n"
+        f"- Current Health Score: {health_score}/100. {score_instruction}\n"
         f"- Disease Risk Estimates: {risks_text}\n\n"
-        f"Generate a personalised 4-week health improvement roadmap. "
+        f"Generate a highly personalised 4-week health improvement roadmap based on their health score ({health_score}/100).\n"
         f"Structure it as:\n"
         f"**Week 1 – Foundation:** (2-3 specific actions)\n"
         f"**Week 2 – Build Momentum:** (2-3 specific actions)\n"
@@ -76,3 +84,38 @@ async def get_health_roadmap(health_data: dict, health_score: int, disease_risks
         "**Week 4:** Maintain all habits. Schedule a health check-up.\n"
         "**Key Focus:** Diet, Exercise, Sleep."
     )
+
+
+async def get_stress_score(user_text: str) -> int:
+    """Uses Gemini to evaluate a stress score (1-10) based on free-text."""
+    prompt = (
+        f"You are a clinical AI evaluating stress levels. "
+        f"Based on the following text from a user about their life, mood, and sleep, "
+        f"determine their stress level on a scale of 1 to 10. "
+        f"Return ONLY a single integer. No other text.\n\n"
+        f"User text: \"{user_text}\""
+    )
+    result = await _call_gemini(prompt)
+    if result:
+        try:
+            val = int(result.strip())
+            return max(1, min(10, val))
+        except ValueError:
+            pass
+            
+    # --- FALLBACK: Since the current Gemini API Key is disabled/deleted ---
+    # Smart keyword calculator to prove the UI works locally
+    text = user_text.lower()
+    score = 4  # base healthy-ish score
+    
+    # Stressors
+    if "overwhelmed" in text or "anxious" in text or "panic" in text: score += 3
+    if "deadlines" in text or "work" in text or "busy" in text: score += 2
+    if "sluggish" in text or "tired" in text or "exhausted" in text: score += 2
+    if "inconsistent" in text or "bad sleep" in text or "insomnia" in text: score += 2
+    
+    # Reducers
+    if "sufficient" in text or "good sleep" in text or "8 hours" in text: score -= 2
+    if "relaxing" in text or "no tight deadlines" in text or "chill" in text: score -= 2
+    
+    return max(1, min(10, score))

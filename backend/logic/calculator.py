@@ -72,6 +72,18 @@ def calculate_health_score(data: dict):
     if data.get("Alcohol_consumption") == "Regular":
         score -= 8; reasons.append("Regular Alcohol Intake")
 
+    steps_day = _safe(data, "steps_per_day")
+    if steps_day is not None:
+        if steps_day < 4000:
+            score -= 5; reasons.append("Low daily step count")
+        elif steps_day > 8000:
+            score += 5
+
+    hr = _safe(data, "heart_rate")
+    if hr is not None:
+        if hr > 100:
+            score -= 5; reasons.append("Elevated resting heart rate")
+
     return max(0, min(100, score)), reasons if reasons else ["Excellent health markers!"]
 
 
@@ -92,6 +104,8 @@ def calculate_disease_risks(data: dict) -> dict:
     sugar   = data.get("sugar_intake", "Low")
     salt    = data.get("salt_intake", "Low")
     is_diabetic = data.get("is_diabetic", False)
+    steps   = _safe(data, "steps_per_day")
+    hr      = _safe(data, "heart_rate")
 
     # ── TYPE-2 DIABETES ──────────────────────────────────────────────────────
     d2 = 5.0
@@ -137,6 +151,17 @@ def calculate_disease_risks(data: dict) -> dict:
     if sugar == "High": ob += 10
     if alcohol == "Regular": ob += 8
     if age > 40: ob += 5
+    if steps and steps > 8000: ob = max(0, ob - 10)
+
+    # Bonus offsets
+    if steps and steps > 8000:
+        d2 = max(0, d2 - 5)
+        ht = max(0, ht - 5)
+        cv = max(0, cv - 5)
+
+    if hr and hr > 100:
+        cv += 10
+        ht += 5
 
     def cap(v): return round(min(v, 97.0), 1)
 

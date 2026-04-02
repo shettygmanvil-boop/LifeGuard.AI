@@ -56,4 +56,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }).then((r) => r.json()),
+
+  calculateStress: (text) =>
+    fetch(`${BASE}/calculate-stress`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }).then((r) => r.json()),
 };

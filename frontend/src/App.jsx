@@ -6,7 +6,6 @@ import Predict from "./pages/Predict";
 import Dashboard from "./pages/Dashboard";
 import Hospitals from "./pages/Hospitals";
 import Profile from "./pages/Profile";
-import Smartwatch from "./pages/Smartwatch";
 
 export default function App() {
   return (
@@ -20,7 +19,6 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/hospitals" element={<Hospitals />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/smartwatch" element={<Smartwatch />} />
           </Routes>
         </div>
       </BrowserRouter>

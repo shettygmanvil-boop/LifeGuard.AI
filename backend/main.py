@@ -12,7 +12,7 @@ from pydantic import BaseModel, validator
 import joblib
 from dotenv import load_dotenv
 
-from services.ai_services import get_health_advice, get_health_roadmap
+from services.ai_services import get_health_advice, get_health_roadmap, get_stress_score
 from services.map_services import get_nearby_hospitals
 from services.voice_services import process_voice_command
 from services.dashboard_service import get_user_health_history
@@ -78,6 +78,8 @@ class HealthData(BaseModel):
     Insulin: Optional[float] = None
     BMI: Optional[float] = None
     DiabetesPedigreeFunction: Optional[float] = None
+    steps_per_day: Optional[int] = None
+    heart_rate: Optional[int] = None
 
     @validator("Glucose", "BloodPressure", "SkinThickness", "Insulin",
                "DiabetesPedigreeFunction", "BMI", pre=True)
@@ -228,6 +230,18 @@ async def login_with_google(google_data: dict):
             "status": "Success",
             "user": dict(user_profile),
         }
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+
+
+@app.post("/calculate-stress")
+async def calculate_stress(data: dict):
+    try:
+        text = data.get("text", "")
+        if not text:
+            return {"status": "Error", "message": "No text provided."}
+        score = await get_stress_score(text)
+        return {"status": "Success", "stress_level": score}
     except Exception as e:
         return {"status": "Error", "message": str(e)}
 

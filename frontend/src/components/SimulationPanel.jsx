@@ -111,6 +111,7 @@ export default function SimulationPanel({ baseData }) {
     Height:           d.Height || 1.75,
     Weight:           d.Weight || 70,
     sleep_duration:   parseFloat(d.sleep_duration) || 7,
+    steps_per_day:    parseInt(d.steps_per_day) || 5000,
     physical_activity: d.physical_activity || "Moderate",
     stress_level:     parseInt(d.stress_level) || 5,
     sugar_intake:     d.sugar_intake || "Low",
@@ -207,6 +208,7 @@ export default function SimulationPanel({ baseData }) {
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
               <SimSlider label="Sleep (hrs)"   field="sleep_duration" min={3} max={12} step={0.5} unit=" hrs" value={sim.sleep_duration} onChange={setField} />
               <SimSlider label={`Stress: ${sim.stress_level}/10`} field="stress_level" min={1} max={10} value={sim.stress_level} onChange={setField} />
+              <SimSlider label="Steps/day" field="steps_per_day" min={0} max={20000} step={500} value={sim.steps_per_day} onChange={setField} />
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 mt-4">
               <SimSelect label="Physical Activity" field="physical_activity" options={["Sedentary", "Moderate", "Active"]} value={sim.physical_activity} onChange={setField} />

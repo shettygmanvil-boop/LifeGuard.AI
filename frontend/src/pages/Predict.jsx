@@ -59,6 +59,8 @@ const defaultForm = {
   SkinThickness: "",
   Insulin: "",
   DiabetesPedigreeFunction: "",
+  steps_per_day: "",
+  heart_rate: "",
 };
 
 const inputCls = "bg-slate-900 border border-slate-700 p-3 rounded-xl text-white focus:border-emerald-500 outline-none transition-colors w-full";
@@ -154,22 +156,16 @@ export default function Predict() {
   const [loading, setLoading] = useState(false);
   const [roadmapLoading, setRoadmapLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [simResult, setSimResult] = useState(null);
   const [roadmap, setRoadmap] = useState(null);
   const [error, setError] = useState(null);
   const [simBase, setSimBase] = useState(null);
 
-  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  const [showStressAI, setShowStressAI] = useState(false);
+  const [stressText, setStressText] = useState("");
+  const [stressAILoading, setStressAILoading] = useState(false);
 
-  // Pick up prefilled data from smartwatch page
-  useEffect(() => {
-    const raw = sessionStorage.getItem("smartwatch_prefill");
-    if (!raw) return;
-    try {
-      const fields = JSON.parse(raw);
-      setForm((p) => ({ ...p, ...fields }));
-      sessionStorage.removeItem("smartwatch_prefill");
-    } catch { /* ignore */ }
-  }, []);
+  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   // Derived: height in metres, weight in kg, sleep in hours
   const heightM   = useMemo(() => toMetres(form.heightVal, form.heightUnit), [form.heightVal, form.heightUnit]);
@@ -192,7 +188,7 @@ export default function Predict() {
     delete payload.weightVal; delete payload.weightUnit;
     delete payload.bedTime;   delete payload.wakeTime;
     // Convert empty strings to null for optional fields
-    ["Pregnancies", "Glucose", "BloodPressure", "SkinThickness", "Insulin", "DiabetesPedigreeFunction"].forEach((k) => {
+    ["Pregnancies", "Glucose", "BloodPressure", "SkinThickness", "Insulin", "DiabetesPedigreeFunction", "steps_per_day", "heart_rate"].forEach((k) => {
       if (payload[k] === "" || payload[k] === 0) payload[k] = null;
       else if (payload[k] !== null) payload[k] = parseFloat(payload[k]);
     });
@@ -232,28 +228,30 @@ export default function Predict() {
     }
   };
 
+  const handleStressAI = async () => {
+    if (!stressText.trim()) return;
+    setStressAILoading(true);
+    try {
+      const res = await api.calculateStress(stressText);
+      if (res.status === "Success") {
+        setForm(p => ({ ...p, stress_level: res.stress_level }));
+        setShowStressAI(false);
+        setStressText("");
+      } else {
+        alert(res.message);
+      }
+    } catch {
+      alert("AI failed to calculate stress. Ensure backend is running.");
+    } finally {
+      setStressAILoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 py-12 px-6">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-4xl font-black mb-2 text-white text-center">Health Risk Prediction</h1>
         <p className="text-slate-400 text-center mb-10">Fill in your details — medical fields are optional. The AI will work with what you provide.</p>
-
-        {/* Smartwatch banner */}
-        <Link
-          to="/smartwatch"
-          className="flex items-center justify-between gap-4 mb-6 p-4 bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border border-emerald-500/30 rounded-2xl hover:border-emerald-400/60 transition-all group"
-        >
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">⌚</span>
-            <div>
-              <p className="text-white font-bold text-sm">Are you a smartwatch user?</p>
-              <p className="text-slate-400 text-xs">Connect Google Fit, Fitbit or import your data for a more accurate analysis</p>
-            </div>
-          </div>
-          <span className="text-emerald-400 font-bold text-sm whitespace-nowrap group-hover:translate-x-1 transition-transform">
-            Click here 👉
-          </span>
-        </Link>
 
         <div className="bg-slate-800/40 rounded-3xl border border-emerald-500/20 p-8 md:p-10 space-y-10">
 
@@ -382,6 +380,15 @@ export default function Predict() {
                   )}
                 </div>
               </Field>
+
+              <Field label="Steps (per day)" optional>
+                <input type="number" className={optInputCls} placeholder="e.g. 5000" value={form.steps_per_day} onChange={(e) => set("steps_per_day", e.target.value)} />
+              </Field>
+
+              <Field label="Heart Rate (bpm)" optional>
+                <input type="number" className={optInputCls} placeholder="e.g. 70" value={form.heart_rate} onChange={(e) => set("heart_rate", e.target.value)} />
+              </Field>
+
               <Field label="Physical Activity">
                 <select className={selectCls} value={form.physical_activity} onChange={(e) => set("physical_activity", e.target.value)}>
                   <option>Sedentary</option><option>Moderate</option><option>Active</option>
@@ -390,7 +397,11 @@ export default function Predict() {
               <Field label={`Stress: ${form.stress_level}/10`}>
                 <div className="pt-3">
                   <input type="range" min="1" max="10" className="w-full accent-emerald-500" value={form.stress_level} onChange={(e) => set("stress_level", +e.target.value)} />
-                  <div className="flex justify-between text-xs text-slate-600 mt-1"><span>Low</span><span>High</span></div>
+                  <div className="flex justify-between text-xs text-slate-600 mt-1 mb-2"><span>Low</span><span>High</span></div>
+                  <button type="button" onClick={() => setShowStressAI(true)} className="text-xs border border-emerald-500/50 px-3 py-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 w-full transition-all mt-2 text-center shadow-md shadow-emerald-500/10 flex flex-col items-center gap-1.5 focus:ring-2 focus:ring-emerald-500">
+                    <span className="text-slate-400 font-medium">Unable to determine your stress? That's fine.</span>
+                    <span className="text-emerald-400 font-bold underline decoration-emerald-500/50 underline-offset-4">Click here for the AI to calculate your stress!</span>
+                  </button>
                 </div>
               </Field>
               <Field label="Diet Quality">
@@ -570,6 +581,39 @@ export default function Predict() {
         <SimulationPanel baseData={simBase || buildPayload()} />
       </div>
 
+
+      {showStressAI && (
+        <div className="fixed inset-0 bg-slate-950/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-2xl w-full max-w-md shadow-2xl">
+            <h3 className="text-white font-black text-xl mb-1 flex items-center gap-2">🤖 AI Stress Evaluation</h3>
+            <p className="text-slate-400 text-sm mb-4 leading-relaxed">
+              Briefly describe your recent sleep schedule, workload, and overall mood. LifeGuard.AI will accurately determine your stress score (1-10) for your profile.
+            </p>
+            <textarea
+              className="bg-slate-950 border border-slate-700 p-3 rounded-xl text-white outline-none focus:border-emerald-500 w-full min-h-[120px] transition-all resize-none text-sm placeholder-slate-600"
+              placeholder="e.g. I have been working 12 hour shifts, sleeping only 5 hours a night. I feel completely overwhelmed and tired."
+              value={stressText}
+              onChange={(e) => setStressText(e.target.value)}
+            />
+            <div className="flex justify-end items-center gap-3 mt-5">
+              <button 
+                disabled={stressAILoading} 
+                onClick={() => setShowStressAI(false)} 
+                className="text-slate-400 text-sm font-bold hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                disabled={stressAILoading || !stressText.trim()} 
+                onClick={handleStressAI} 
+                className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
+              >
+                {stressAILoading ? "Analyzing Profile..." : "Calculate Score →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

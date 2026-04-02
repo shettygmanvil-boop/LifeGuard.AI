@@ -7,7 +7,6 @@ import { api } from "../api";
 export default function Navbar() {
   const { user, login, logout } = useAuth();
   const navigate = useNavigate();
-  const [listening, setListening] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
 
   const googleLogin = useGoogleLogin({
@@ -46,37 +45,6 @@ export default function Navbar() {
     onError: () => setLoginLoading(false),
   });
 
-  const handleVoice = () => {
-    if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
-      alert("Voice not supported in this browser. Try Chrome.");
-      return;
-    }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SR();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    setListening(true);
-    recognition.start();
-    recognition.onresult = async (e) => {
-      const text = e.results[0][0].transcript;
-      setListening(false);
-      try {
-        const res = await api.voiceCommand(text);
-        const intent = res.intent;
-        if (intent === "redirect_to_prediction") navigate("/predict");
-        else if (intent === "show_health_dashboard") navigate("/dashboard");
-        else if (intent === "open_hospital_map") navigate("/hospitals");
-      } catch {
-        const t = text.toLowerCase();
-        if (t.includes("risk") || t.includes("predict") || t.includes("diabetes")) navigate("/predict");
-        else if (t.includes("dashboard") || t.includes("score")) navigate("/dashboard");
-        else if (t.includes("hospital")) navigate("/hospitals");
-      }
-    };
-    recognition.onerror = () => setListening(false);
-    recognition.onend = () => setListening(false);
-  };
-
   const avatar = user?.profile_picture || user?.picture ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.full_name || "U")}&background=10b981&color=fff`;
 
@@ -96,22 +64,6 @@ export default function Navbar() {
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Voice */}
-        <button
-          onClick={handleVoice}
-          title="Voice Command"
-          className={`p-2 rounded-full border transition-all ${
-            listening
-              ? "border-emerald-400 text-emerald-400 animate-pulse"
-              : "border-slate-700 text-slate-400 hover:border-emerald-500 hover:text-emerald-400"
-          }`}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-          </svg>
-        </button>
-
         {user ? (
           <div className="flex items-center gap-3">
             <img src={avatar} alt="avatar" className="w-8 h-8 rounded-full border-2 border-emerald-500 object-cover" />
